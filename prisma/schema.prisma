@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Direct (unpooled) connection used for schema push/migrations. The Vercel
+  // Neon integration provides this automatically as DATABASE_URL_UNPOOLED.
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// A withdraw-linked voucher. In live mode the actual payout + one-time-use are
+// enforced by the ISSUER'S OWN LNbits "Withdraw Link": Sparkstub uses the admin
+// key once to create that link, then DISCARDS it. We store only the resulting
+// PUBLIC lnurl — never a spending key — so a breach of this app exposes no funds.
+model Voucher {
+  id          String    @id @default(cuid())
+  title       String
+  amountSats  Int
+
+  // Secret token that grants management (view status / void) of this voucher.
+  manageToken String    @unique
+  // Secret in the LNbits webhook URL, so only LNbits can mark this voucher claimed.
+  webhookSecret String  @unique
+  // Used only in simulated/dev mode for Sparkstub's own LNURL flow.
+  k1          String    @unique
+
+  // Live mode: the public withdraw LNURL minted in the issuer's LNbits, and its
+  // link id there. Null in simulated mode (Sparkstub serves its own LNURL).
+  lnbitsLnurl  String?
+  lnbitsLinkId String?
+
+  // ACTIVE | REDEEMED | EXPIRED
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  redeemedAt  DateTime?
+
+  attempts    RedemptionAttempt[]
+
+  @@index([status])
+}
+
+// Audit trail of claim events / attempts.
+model RedemptionAttempt {
+  id        String   @id @default(cuid())
+  voucher   Voucher? @relation(fields: [voucherId], references: [id])
+  voucherId String?
+  // PAID | REJECTED_ALREADY | REJECTED_EXPIRED | REJECTED_INVALID | ERROR_PAYMENT
+  outcome   String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([voucherId])
+}
