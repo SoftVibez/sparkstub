@@ -3,11 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // Direct (unpooled) connection used for schema push/migrations. The Vercel
-  // Neon integration provides this automatically as DATABASE_URL_UNPOOLED.
-  directUrl = env("DATABASE_URL_UNPOOLED")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // A withdraw-linked voucher. In live mode the actual payout + one-time-use are
